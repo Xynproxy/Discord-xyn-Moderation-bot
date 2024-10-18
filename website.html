@@ -3,77 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Moderation Bot Dashboard</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            color: #333;
-            text-align: center;
-            padding: 50px;
-        }
-        header {
-            background-color: #333;
-            color: white;
-            padding: 20px;
-        }
-        h1 {
-            margin: 0;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-        }
-        .input-container {
-            margin: 15px 0;
-        }
-        button {
-            padding: 10px 20px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            cursor: pointer;
-            border-radius: 5px;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-    </style>
-    <script src="api.js" defer></script> <!-- Link to the api.js file -->
+    <title>Moderation Actions</title>
 </head>
 <body>
+    <h1>Moderation Actions</h1>
 
-<header>
-    <h1>Moderation Bot Dashboard</h1>
-</header>
-
-<div class="container">
-    <p>Use the buttons below to manage your server:</p>
-
-    <!-- Input fields for Guild ID and User ID -->
-    <div class="input-container">
-        <label for="guildId">Guild ID:</label>
-        <input type="text" id="guildId" placeholder="Enter Guild ID">
-    </div>
-    <div class="input-container">
+    <form>
         <label for="userId">User ID:</label>
-        <input type="text" id="userId" placeholder="Enter User ID">
-    </div>
+        <input type="text" id="userId" required><br><br>
 
-    <!-- Buttons for moderation commands -->
-    <button id="muteButton">Mute User</button>
-    <button onclick="unmuteUser(document.querySelector('#guildId').value, document.querySelector('#userId').value)">Unmute User</button>
-    <button onclick="banUser(document.querySelector('#guildId').value, document.querySelector('#userId').value)">Ban User</button>
-    <button onclick="unbanUser(document.querySelector('#guildId').value, document.querySelector('#userId').value)">Unban User</button>
-    <button onclick="kickUser(document.querySelector('#guildId').value, document.querySelector('#userId').value)">Kick User</button>
+        <label for="guildId">Guild ID:</label>
+        <input type="text" id="guildId" required><br><br>
 
-    <!-- Warn user with reason input -->
-    <div class="input-container">
-        <label for="warnReason">Warn Reason:</label>
-        <input type="text" id="warnReason" placeholder="Enter reason for warning">
-    </div>
-    <button onclick="warnUser(document.querySelector('#guildId').value, document.querySelector('#userId').value, document.querySelector('#warnReason').value)">Warn User</button>
-</div>
+        <label for="warnReason">Reason for Warning:</label>
+        <input type="text" id="warnReason" required><br><br>
 
+        <button type="button" onclick="banUser()">Ban User</button>
+        <button type="button" onclick="muteUser()">Mute User</button>
+        <button type="button" onclick="warnUser()">Warn User</button>
+    </form>
+
+    <script src="webhook.js"></script>
 </body>
 </html>
