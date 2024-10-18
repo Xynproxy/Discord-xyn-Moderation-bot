@@ -1,5 +1,15 @@
-const { Client, Intents } = require('discord.js');
-const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.GUILD_MEMBERS] });
+const { Client, Intents, MessageEmbed } = require('discord.js');
+const ms = require('ms');  // Add this to handle time formats like '10m', '2h'
+const config = require('./config.json');  // Import your config.json file
+
+const client = new Client({ 
+    intents: [
+        Intents.FLAGS.GUILDS,
+        Intents.FLAGS.GUILD_MESSAGES,
+        Intents.FLAGS.GUILD_MEMBERS
+    ] 
+});
+
 const prefix = '!';
 
 client.once('ready', () => {
@@ -14,6 +24,7 @@ client.on('messageCreate', async message => {
 
     const target = message.mentions.members.first() || message.guild.members.cache.get(args[0]);
 
+    // Check if the user has the required permissions to execute the command
     if (!message.member.permissions.has('MODERATE_MEMBERS')) {
         return message.reply("You don't have permission to use this command.");
     }
@@ -24,10 +35,19 @@ client.on('messageCreate', async message => {
 
     // Mute Command
     if (command === 'mute') {
-        const muteDuration = args[1] || '10m'; // Default mute for 10 minutes
+        const muteDuration = args[1] ? ms(args[1]) : 600000; // Default mute for 10 minutes (600000ms)
+        if (!muteDuration) return message.reply("Invalid time format.");
+
         try {
-            await target.timeout(ms(muteDuration), "Muted by moderator");
-            message.channel.send(`${target.user.tag} has been muted for ${muteDuration}.`);
+            await target.timeout(muteDuration, "Muted by moderator");
+            const muteEmbed = new MessageEmbed()
+                .setColor('YELLOW')
+                .setTitle('User Muted')
+                .addField('User:', target.user.tag, true)
+                .addField('Duration:', ms(muteDuration, { long: true }), true)
+                .setFooter(`Muted by ${message.author.tag}`, message.author.displayAvatarURL())
+                .setTimestamp();
+            message.channel.send({ embeds: [muteEmbed] });
         } catch (error) {
             message.reply("Failed to mute the user.");
         }
@@ -37,7 +57,13 @@ client.on('messageCreate', async message => {
     if (command === 'unmute') {
         try {
             await target.timeout(null); // Remove mute
-            message.channel.send(`${target.user.tag} has been unmuted.`);
+            const unmuteEmbed = new MessageEmbed()
+                .setColor('GREEN')
+                .setTitle('User Unmuted')
+                .addField('User:', target.user.tag, true)
+                .setFooter(`Unmuted by ${message.author.tag}`, message.author.displayAvatarURL())
+                .setTimestamp();
+            message.channel.send({ embeds: [unmuteEmbed] });
         } catch (error) {
             message.reply("Failed to unmute the user.");
         }
@@ -48,7 +74,14 @@ client.on('messageCreate', async message => {
         const reason = args.slice(1).join(' ') || 'No reason provided';
         try {
             await target.ban({ reason });
-            message.channel.send(`${target.user.tag} has been banned. Reason: ${reason}`);
+            const banEmbed = new MessageEmbed()
+                .setColor('RED')
+                .setTitle('User Banned')
+                .addField('User:', target.user.tag, true)
+                .addField('Reason:', reason, true)
+                .setFooter(`Banned by ${message.author.tag}`, message.author.displayAvatarURL())
+                .setTimestamp();
+            message.channel.send({ embeds: [banEmbed] });
         } catch (error) {
             message.reply("Failed to ban the user.");
         }
@@ -57,23 +90,44 @@ client.on('messageCreate', async message => {
     // Unban Command
     if (command === 'unban') {
         const userId = args[0];
+        if (!userId) return message.reply("Please provide a valid user ID.");
+
         try {
             await message.guild.members.unban(userId);
-            message.channel.send(`User with ID ${userId} has been unbanned.`);
+            const unbanEmbed = new MessageEmbed()
+                .setColor('GREEN')
+                .setTitle('User Unbanned')
+                .addField('User ID:', userId, true)
+                .setFooter(`Unbanned by ${message.author.tag}`, message.author.displayAvatarURL())
+                .setTimestamp();
+            message.channel.send({ embeds: [unbanEmbed] });
         } catch (error) {
             message.reply("Failed to unban the user.");
         }
     }
 
-    // Warn Command (This can be enhanced with a database system)
+    // Warn Command
     if (command === 'warn') {
         const reason = args.slice(1).join(' ') || 'No reason provided';
-        message.channel.send(`${target.user.tag} has been warned. Reason: ${reason}`);
+        const warnEmbed = new MessageEmbed()
+            .setColor('ORANGE')
+            .setTitle('User Warned')
+            .addField('User:', target.user.tag, true)
+            .addField('Reason:', reason, true)
+            .setFooter(`Warned by ${message.author.tag}`, message.author.displayAvatarURL())
+            .setTimestamp();
+        message.channel.send({ embeds: [warnEmbed] });
     }
 
-    // Unwarn Command (Also works well with a database)
+    // Unwarn Command
     if (command === 'unwarn') {
-        message.channel.send(`The warn for ${target.user.tag} has been removed.`);
+        const unwarnEmbed = new MessageEmbed()
+            .setColor('BLUE')
+            .setTitle('Warn Removed')
+            .addField('User:', target.user.tag, true)
+            .setFooter(`Unwarned by ${message.author.tag}`, message.author.displayAvatarURL())
+            .setTimestamp();
+        message.channel.send({ embeds: [unwarnEmbed] });
     }
 
     // Kick Command
@@ -81,11 +135,31 @@ client.on('messageCreate', async message => {
         const reason = args.slice(1).join(' ') || 'No reason provided';
         try {
             await target.kick(reason);
-            message.channel.send(`${target.user.tag} has been kicked. Reason: ${reason}`);
+            const kickEmbed = new MessageEmbed()
+                .setColor('RED')
+                .setTitle('User Kicked')
+                .addField('User:', target.user.tag, true)
+                .addField('Reason:', reason, true)
+                .setFooter(`Kicked by ${message.author.tag}`, message.author.displayAvatarURL())
+                .setTimestamp();
+            message.channel.send({ embeds: [kickEmbed] });
         } catch (error) {
             message.reply("Failed to kick the user.");
         }
     }
+
+    // Ping Command
+    if (command === 'ping') {
+        const pingEmbed = new MessageEmbed()
+            .setColor('BLUE')
+            .setTitle('Pong!')
+            .addField('Bot Latency:', `${Math.round(client.ws.ping)}ms`, true)
+            .addField('API Latency:', `${message.client.ws.ping}ms`, true)
+            .setFooter(`Ping requested by ${message.author.tag}`, message.author.displayAvatarURL())
+            .setTimestamp();
+        message.channel.send({ embeds: [pingEmbed] });
+    }
 });
 
-client.login('YOUR_BOT_TOKEN');
+// Log in with the token stored in config.json
+client.login(config.token);
