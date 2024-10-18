@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Moderation Bot</title>
+    <title>Moderation Bot Dashboard</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -24,38 +24,55 @@
             max-width: 800px;
             margin: 0 auto;
         }
-        ul {
-            list-style-type: none;
-            padding: 0;
+        .input-container {
+            margin: 15px 0;
         }
-        li {
-            background-color: #f9f9f9;
-            border: 1px solid #ddd;
-            margin: 10px 0;
-            padding: 15px;
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
             border-radius: 5px;
         }
+        button:hover {
+            background-color: #0056b3;
+        }
     </style>
+    <script src="api.js" defer></script> <!-- Link to the api.js file -->
 </head>
 <body>
 
 <header>
-    <h1>Moderation Bot</h1>
+    <h1>Moderation Bot Dashboard</h1>
 </header>
 
 <div class="container">
-    <p>Welcome to the Moderation Bot! This bot helps with managing your server, offering commands like muting, kicking, banning, and more.</p>
+    <p>Use the buttons below to manage your server:</p>
 
-    <h2>Commands</h2>
-    <ul>
-        <li><strong>!mute [user]</strong>: Mute a user.</li>
-        <li><strong>!unmute [user]</strong>: Unmute a user.</li>
-        <li><strong>!ban [user]</strong>: Ban a user.</li>
-        <li><strong>!unban [user ID]</strong>: Unban a user by their ID.</li>
-        <li><strong>!warn [user] [reason]</strong>: Warn a user.</li>
-        <li><strong>!unwarn [user]</strong>: Remove a user's warn.</li>
-        <li><strong>!kick [user]</strong>: Kick a user.</li>
-    </ul>
+    <!-- Input fields for Guild ID and User ID -->
+    <div class="input-container">
+        <label for="guildId">Guild ID:</label>
+        <input type="text" id="guildId" placeholder="Enter Guild ID">
+    </div>
+    <div class="input-container">
+        <label for="userId">User ID:</label>
+        <input type="text" id="userId" placeholder="Enter User ID">
+    </div>
+
+    <!-- Buttons for moderation commands -->
+    <button id="muteButton">Mute User</button>
+    <button onclick="unmuteUser(document.querySelector('#guildId').value, document.querySelector('#userId').value)">Unmute User</button>
+    <button onclick="banUser(document.querySelector('#guildId').value, document.querySelector('#userId').value)">Ban User</button>
+    <button onclick="unbanUser(document.querySelector('#guildId').value, document.querySelector('#userId').value)">Unban User</button>
+    <button onclick="kickUser(document.querySelector('#guildId').value, document.querySelector('#userId').value)">Kick User</button>
+
+    <!-- Warn user with reason input -->
+    <div class="input-container">
+        <label for="warnReason">Warn Reason:</label>
+        <input type="text" id="warnReason" placeholder="Enter reason for warning">
+    </div>
+    <button onclick="warnUser(document.querySelector('#guildId').value, document.querySelector('#userId').value, document.querySelector('#warnReason').value)">Warn User</button>
 </div>
 
 </body>
