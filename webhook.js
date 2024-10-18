@@ -1,156 +1,140 @@
-// api.js (Node.js Backend)
+// index.js
 
 const express = require('express');
+const session = require('express-session');
+const passport = require('passport');
+const { Strategy: DiscordStrategy } = require('passport-discord');
 const axios = require('axios');
+const config = require('./config.json');  // Import config.json
 const app = express();
-const PORT = 3000;
 
-app.use(express.json());
+const PORT = process.env.PORT || 3000;
 
-// Discord Webhook URL for logging actions
-const webhookUrl = 'YOUR_DISCORD_WEBHOOK_URL';  // Replace with actual webhook URL
+// Setting up session and passport
+app.use(session({
+    secret: 'secret_key',
+    resave: false,
+    saveUninitialized: true,
+}));
+app.use(passport.initialize());
+app.use(passport.session());
 
-// Example roles for validation
-const staffRoles = ['Staff', 'Moderator'];  // Example role names
-const botFounders = ['BotFounder'];  // Example bot founder role
+// Configure Discord OAuth2 Strategy
+passport.use(new DiscordStrategy({
+    clientID: config.clientID,
+    clientSecret: config.clientSecret,
+    callbackURL: config.redirectURI,
+    scope: ['identify', 'guilds', 'guilds.members.read'],
+}, async (accessToken, refreshToken, profile, done) => {
+    // Add user's profile to the session
+    profile.accessToken = accessToken;
+    return done(null, profile);
+}));
 
-// Simulate checking if a user has a valid role (this could be fetched from Discord's API)
-function hasRole(userId, roles) {
-    // In a real scenario, this would be done through a Discord API request
-    return roles.some(role => staffRoles.includes(role));  // Simulate checking roles
-}
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((user, done) => done(null, user));
 
-// Mute User API
-app.post('/api/mute', async (req, res) => {
-    const { userId, guildId, roles, actionBy } = req.body;
-
-    // Check if the action sender has the required role
-    if (!hasRole(actionBy, roles)) {
-        return res.status(403).json({ error: 'You do not have permission to mute users.' });
-    }
-
-    // Log the mute action to Discord Webhook
-    await axios.post(webhookUrl, {
-        content: `User ${userId} was muted by ${actionBy} in guild ${guildId}.`
-    });
-
-    return res.status(200).json({ message: 'User muted and action logged.' });
+// API for Discord Authentication
+app.get('/login', (req, res) => {
+    res.redirect('/auth/discord');
 });
 
-// Ban User API
-app.post('/api/ban', async (req, res) => {
-    const { userId, guildId, roles, actionBy } = req.body;
+// Handle Discord OAuth2 Redirect
+app.get('/auth/discord', passport.authenticate('discord'));
 
-    // Check if the action sender has the required role
-    if (!hasRole(actionBy, roles)) {
-        return res.status(403).json({ error: 'You do not have permission to ban users.' });
-    }
-
-    // Log the ban action to Discord Webhook
-    await axios.post(webhookUrl, {
-        content: `User ${userId} was banned by ${actionBy} in guild ${guildId}.`
-    });
-
-    return res.status(200).json({ message: 'User banned and action logged.' });
+// Handle Callback from Discord
+app.get('/auth/discord/callback', passport.authenticate('discord', { failureRedirect: '/' }), async (req, res) => {
+    res.redirect('/dashboard');
 });
 
-// Warn User API
-app.post('/api/warn', async (req, res) => {
-    const { userId, guildId, roles, reason, actionBy } = req.body;
+// Dashboard Route
+app.get('/dashboard', async (req, res) => {
+    if (!req.isAuthenticated()) return res.redirect('/login');
 
-    // Check if the action sender has the required role
-    if (!hasRole(actionBy, roles)) {
-        return res.status(403).json({ error: 'You do not have permission to warn users.' });
-    }
+    const userId = req.user.id;
+    const accessToken = req.user.accessToken;
+    const guildId = config.guildID;
 
-    // Log the warn action to Discord Webhook
-    await axios.post(webhookUrl, {
-        content: `User ${userId} was warned by ${actionBy} in guild ${guildId} for: ${reason}.`
-    });
-
-    return res.status(200).json({ message: 'User warned and action logged.' });
-});
-
-// API to get bot founder data
-app.get('/api/bot-data', (req, res) => {
-    const { botId } = req.query;
-
-    // Check if the botId matches a bot founder
-    if (botFounders.includes(botId)) {
-        return res.status(200).json({ message: 'Bot Founder data retrieved.' });
-    } else {
-        return res.status(403).json({ error: 'Access denied to non-founders.' });
-    }
-});
-
-// Start the server
-app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
-});
-// api.js (Frontend)
-
-const apiUrl = 'http://localhost:3000';  // Your backend API URL
-
-async function sendCommand(endpoint, data) {
     try {
-        const response = await fetch(`${apiUrl}/api/${endpoint}`, {
-            method: 'POST',
+        // Fetch the guild's members using the bot token
+        const members = await axios.get(`https://discord.com/api/v10/guilds/${guildId}/members`, {
             headers: {
-                'Content-Type': 'application/json',
+                Authorization: `Bot ${config.botToken}`,
             },
-            body: JSON.stringify(data),
         });
-        const result = await response.json();
-        if (response.ok) {
-            alert(result.message);  // Display success message
+
+        const member = members.data.find(member => member.user.id === userId);
+
+        if (!member) return res.send('You are not part of this guild.');
+
+        // Check if the user has the necessary permissions
+        const hasPermission = member.roles.some(role => role === 'Staff Team' || member.permissions.includes('MANAGE_GUILD') || member.permissions.includes('ADMINISTRATOR'));
+
+        if (hasPermission) {
+            res.send(`
+                <h1>Welcome to the Moderation Dashboard</h1>
+                <p>You have the required permissions to moderate actions in this server.</p>
+                <p>Your Discord ID: ${userId}</p>
+                <p>Guild ID: ${guildId}</p>
+                <a href="/ban">Ban a User</a><br>
+                <a href="/mute">Mute a User</a><br>
+                <a href="/warn">Warn a User</a><br>
+                <a href="/kick">Kick a User</a><br>
+            `);
         } else {
-            alert(result.error);  // Display error message
+            res.send('You do not have the required permissions to access this dashboard.');
         }
+
     } catch (error) {
-        console.error('Error:', error);
-        alert('An error occurred while processing the request.');
+        console.error('Error fetching members:', error);
+        res.send('An error occurred while fetching guild members.');
+    }
+});
+
+// API for banning a user
+app.post('/api/ban', async (req, res) => {
+    const { userId, reason } = req.body;
+    if (!req.isAuthenticated()) return res.status(401).send('You must be logged in.');
+
+    const { accessToken, id: actionById } = req.user;
+    const guildId = config.guildID;
+
+    try {
+        // Check user permissions before proceeding
+        const isPermitted = await checkPermissions(guildId, actionById);
+        if (!isPermitted) return res.status(403).send('You do not have permission to ban users.');
+
+        await axios.post(`https://discord.com/api/v10/guilds/${guildId}/bans/${userId}`, {
+            reason: reason,
+        }, {
+            headers: {
+                Authorization: `Bot ${config.botToken}`,
+            },
+        });
+
+        res.send({ message: 'User banned successfully!' });
+    } catch (error) {
+        console.error('Error banning user:', error);
+        res.status(500).send('An error occurred while banning the user.');
+    }
+});
+
+// Check if the user has permission
+async function checkPermissions(guildId, userId) {
+    try {
+        const { data: member } = await axios.get(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
+            headers: { Authorization: `Bot ${config.botToken}` },
+        });
+
+        // Check if the user has 'Admin' or 'Manage Guild' permission or belongs to the 'Staff Team' role
+        return member.roles.some(role => role === 'Staff Team' || member.permissions.includes('MANAGE_GUILD') || member.permissions.includes('ADMINISTRATOR'));
+    } catch (error) {
+        console.error('Error checking permissions:', error);
+        return false;
     }
 }
 
-// Ban User function
-function banUser() {
-    const userId = document.querySelector('#userId').value;
-    const guildId = document.querySelector('#guildId').value;
-    const roles = ['Staff'];  // Example user roles
-    const actionBy = 'Admin'; // Example action by user
-
-    const data = {
-        userId, guildId, roles, actionBy
-    };
-
-    sendCommand('ban', data);
-}
-
-// Mute User function
-function muteUser() {
-    const userId = document.querySelector('#userId').value;
-    const guildId = document.querySelector('#guildId').value;
-    const roles = ['Staff'];  // Example user roles
-    const actionBy = 'Admin'; // Example action by user
-
-    const data = {
-        userId, guildId, roles, actionBy
-    };
-
-    sendCommand('mute', data);
-}
-
-// Warn User function
-function warnUser() {
-    const userId = document.querySelector('#userId').value;
-    const guildId = document.querySelector('#guildId').value;
-    const reason = document.querySelector('#warnReason').value;
-    const roles = ['Staff'];  // Example user roles
-    const actionBy = 'Admin'; // Example action by user
-
-    const data = {
-        userId, guildId, roles, reason, actionBy
-    };
-
-    sendCommand('warn', data);
-}
+// Start server
+app.listen(PORT, () => {
+    console.log(`Server running at http://localhost:${PORT}`);
+});
